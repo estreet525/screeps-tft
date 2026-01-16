@@ -1,0 +1,7 @@
+# Node
+middleware/node_modules/
+middleware/.env
+
+# OS junk
+.DS_Store
+Thumbs.db
