@@ -1,6 +1,6 @@
 const dashboard = require("dashboard");
 
-const roleHarvester = require("roles/harvester.js");
+const roleHarvester = require("roles.harvester");
 
 module.exports.loop = function () {
   // --- Housekeeping (optional but nice) ---
