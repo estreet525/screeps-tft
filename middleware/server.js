@@ -14,13 +14,14 @@ if (!TOKEN) {
 }
 
 async function getDashboardMemory() {
-  const url = `${SCREEPS_HOST}/api/user/memory?path=dashboard&shard=${encodeURIComponent(SHARD)}`;
+  // Using _token query param as an alternative auth method
+  // (Docs: X-Token header OR _token query param are both valid)
+  const url =
+    `${SCREEPS_HOST}/api/user/memory?path=dashboard` +
+    `&shard=${encodeURIComponent(SHARD)}` +
+    `&_token=${encodeURIComponent(TOKEN)}`;
 
-  const res = await fetch(url, {
-    headers: {
-      "X-Token": TOKEN
-    }
-  });
+  const res = await fetch(url);
 
   if (!res.ok) {
     const text = await res.text();
@@ -29,17 +30,36 @@ async function getDashboardMemory() {
 
   const body = await res.json();
 
-  // body.data is a JSON string representing Memory.dashboard
-  // Example: { ok: 1, data: "{\"v\":1,\"tick\":...}" }
+  // body.data can be:
+  // - a JSON string (common)
+  // - an object (some wrappers/libraries)
+  // - null/undefined if the path doesn't exist on that shard
   if (!body || body.ok !== 1) return null;
-  if (!body.data) return null;
 
-  try {
-    return JSON.parse(body.data);
-  } catch {
-    return null;
+  const d = body.data;
+
+  if (d == null) return null;
+
+  // If it's already an object, just return it
+  if (typeof d === "object") return d;
+
+  // If it's a string, try parsing JSON
+  if (typeof d === "string") {
+    const trimmed = d.trim();
+    if (!trimmed) return null;
+
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      // If it's not JSON (e.g., "undefined"), return raw string so we can see it
+      return { raw: trimmed };
+    }
   }
+
+  // Fallback for unexpected types
+  return { raw: String(d) };
 }
+
 
 const app = express();
 
@@ -59,6 +79,18 @@ app.get("/snapshot", async (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+app.get("/snapshot-raw", async (req, res) => {
+  const url =
+    `${SCREEPS_HOST}/api/user/memory?path=dashboard` +
+    `&shard=${encodeURIComponent(SHARD)}` +
+    `&_token=${encodeURIComponent(TOKEN)}`;
+
+  const r = await fetch(url);
+  const text = await r.text();
+
+  res.type("text/plain").send(text);
 });
 
 app.listen(PORT, "0.0.0.0", () => {
