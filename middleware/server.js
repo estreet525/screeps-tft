@@ -48,4 +48,56 @@ async function getDashboardMemory() {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Screeps API ${res.status}: ${text}`)
+    throw new Error(`Screeps API ${res.status}: ${text}`);
+  }
+
+  const body = await res.json();
+
+  if (!body || body.ok !== 1) return null;
+
+  // body.data is the memory at path=dashboard (string or gz:string)
+  return decodeScreepsMemoryData(body.data);
+}
+
+const app = express();
+
+app.get("/health", (req, res) => {
+  res.json({ ok: true, host: SCREEPS_HOST, shard: SHARD });
+});
+
+app.get("/snapshot", async (req, res) => {
+  try {
+    const dashboard = await getDashboardMemory();
+    res.json({
+      ok: true,
+      fetchedAt: Date.now(),
+      shard: SHARD,
+      dashboard,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Raw debug: shows the exact Screeps response body (useful while we’re setting up)
+app.get("/snapshot-raw", async (req, res) => {
+  try {
+    const url =
+      `${SCREEPS_HOST}/api/user/memory?path=dashboard` +
+      `&shard=${encodeURIComponent(SHARD)}`;
+
+    const r = await fetch(url, {
+      headers: { "X-Token": TOKEN },
+    });
+
+    const text = await r.text();
+    res.status(r.status).type("text/plain").send(text);
+  } catch (err) {
+    res.status(500).type("text/plain").send(String(err));
+  }
+});
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`✅ Middleware running: http://localhost:${PORT}/snapshot`);
+  console.log(`🧪 Raw debug:          http://localhost:${PORT}/snapshot-raw`);
+});
