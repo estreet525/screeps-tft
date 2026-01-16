@@ -1,5 +1,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
+const pako = require("pako");
+
 
 dotenv.config();
 
@@ -37,28 +39,30 @@ async function getDashboardMemory() {
   if (!body || body.ok !== 1) return null;
 
   const d = body.data;
-
   if (d == null) return null;
 
-  // If it's already an object, just return it
+  // If it's already an object, return it
   if (typeof d === "object") return d;
 
-  // If it's a string, try parsing JSON
   if (typeof d === "string") {
     const trimmed = d.trim();
     if (!trimmed) return null;
 
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      // If it's not JSON (e.g., "undefined"), return raw string so we can see it
-      return { raw: trimmed };
+    // Handle Screeps gzipped memory format: "gz:<base64>"
+    if (trimmed.startsWith("gz:")) {
+      const b64 = trimmed.slice(3);
+      const compressed = Buffer.from(b64, "base64");
+      const inflated = pako.ungzip(compressed, { to: "string" });
+
+      // inflated should be JSON (string)
+      return JSON.parse(inflated);
     }
+
+    // Normal JSON string
+    return JSON.parse(trimmed);
   }
 
-  // Fallback for unexpected types
   return { raw: String(d) };
-}
 
 
 const app = express();
